@@ -21,6 +21,16 @@ SBIT(TDI, 0x90, 6);
 SBIT(TDO, 0x90, 7);
 */
 
+
+//uncomment to enable AS mode
+#define FTDI_AS_MODE
+
+#ifdef FTDI_AS_MODE
+SBIT(NCS, 0x90,4);
+SBIT(NCE, 0xB0,4);
+SBIT(ASDO, 0xB0,3);
+#endif
+
 SBIT(TMS, 0xB0, 2); // P3.2
 SBIT(TCK, 0x90, 7); // P1.7
 SBIT(TDI, 0x90, 5); // P1.5
@@ -591,6 +601,20 @@ void main()
 	USBDeviceEndPointCfg(); //端点配置
 	USBDeviceIntCfg();		//中断初始化
 
+
+	#ifdef FTDI_AS_MODE
+
+	//P1.1, 1.5, 1.7 output push-pull,P1.4 P1.6 input
+	P1_MOD_OC &= ~((1 << 1) | (1 << 5) | (1 << 7)|(1 << 4));
+	P1_MOD_OC |= ((1 << 6));
+	P1_DIR_PU |= ((1 << 1) | (1 << 5) | (1 << 7) | (1 << 6)|(1 << 4));
+	//P3.2 P3.4 output push-pull,P3.3 INPUT
+	P3_MOD_OC &= ~((1 << 2)|(1 << 4));
+	P3_MOD_OC |= (1 << 3);
+	P3_DIR_PU |= ((1 << 2)|(1 << 4)|(1 << 3));
+
+	#else
+
 	//P1.1, 1.5, 1.7 output push-pull, P1.6 input
 	P1_MOD_OC &= ~((1 << 1) | (1 << 5) | (1 << 7));
 	P1_MOD_OC |= (1 << 6);
@@ -598,7 +622,16 @@ void main()
 	//P3.2 output push-pull
 	P3_MOD_OC &= ~(1 << 2);
 	P3_DIR_PU |= (1 << 2);
+
+	#endif
+
 	TDO = 1;
+
+	#ifdef FTDI_AS_MODE
+	ASDO = 1;
+	NCS = 0;
+	#endif
+
 
 	UEP0_T_LEN = 0;
 	UEP1_T_LEN = 0; //预使用发送长度一定要清空
@@ -665,9 +698,27 @@ void main()
 						TDI = P2B4;
 						TMS = P2B1;
 						TCK = P2B0;
+
+						#ifdef FTDI_AS_MODE
+							NCE = P2B2;
+							NCS = P2B3;
+						#endif
+
+						#ifdef FTDI_AS_MODE
+								transmit_buffer[transmit_buffer_in_offset] = TDO;
+								transmit_buffer[transmit_buffer_in_offset] |= (ASDO<<1);
+								transmit_buffer_in_offset++;
+								transmit_buffer_in_offset &= 0x7f;// %= sizeof(transmit_buffer);
+						#else
+
 						transmit_buffer[transmit_buffer_in_offset] = TDO;
 						transmit_buffer_in_offset++;
 						transmit_buffer_in_offset &= 0x7f;// %= sizeof(transmit_buffer);
+
+						#endif
+
+
+
 					}
 					else
 					{
@@ -675,6 +726,12 @@ void main()
 						TDI = P2B4;
 						TMS = P2B1;
 						TCK = P2B0;
+
+						#ifdef FTDI_AS_MODE
+							NCE = P2B2;
+							NCS = P2B3;
+						#endif
+
 					}
 				}
 				else
@@ -682,6 +739,56 @@ void main()
 					shift_count--;
 					if (read_en)
 					{
+
+
+						#ifdef FTDI_AS_MODE
+
+						if(!NCS){
+
+						TDI = P2B0;
+						P2B0 = ASDO;
+						TCK = 1;
+						TCK = 0;
+
+						TDI = P2B1;
+						P2B1 = ASDO;
+						TCK = 1;
+						TCK = 0;
+
+						TDI = P2B2;
+						P2B2 = ASDO;
+						TCK = 1;
+						TCK = 0;
+
+						TDI = P2B3;
+						P2B3 = ASDO;
+						TCK = 1;
+						TCK = 0;
+
+						TDI = P2B4;
+						P2B4 = ASDO;
+						TCK = 1;
+						TCK = 0;
+
+						TDI = P2B5;
+						P2B5 = ASDO;
+						TCK = 1;
+						TCK = 0;
+
+						TDI = P2B6;
+						P2B6 = ASDO;
+						TCK = 1;
+						TCK = 0;
+
+						TDI = P2B7;
+						P2B7 = ASDO;
+						TCK = 1;
+						TCK = 0;
+
+						transmit_buffer[transmit_buffer_in_offset] = P2;
+						transmit_buffer_in_offset++;
+						transmit_buffer_in_offset &= 0x7f;
+					}else{
 						TDI = P2B0;
 						P2B0 = TDO;
 						TCK = 1;
@@ -725,6 +832,56 @@ void main()
 						transmit_buffer[transmit_buffer_in_offset] = P2;
 						transmit_buffer_in_offset++;
 						transmit_buffer_in_offset &= 0x7f;
+					}
+						
+						#else
+
+
+						TDI = P2B0;
+						P2B0 = TDO;
+						TCK = 1;
+						TCK = 0;
+
+						TDI = P2B1;
+						P2B1 = TDO;
+						TCK = 1;
+						TCK = 0;
+
+						TDI = P2B2;
+						P2B2 = TDO;
+						TCK = 1;
+						TCK = 0;
+
+						TDI = P2B3;
+						P2B3 = TDO;
+						TCK = 1;
+						TCK = 0;
+
+						TDI = P2B4;
+						P2B4 = TDO;
+						TCK = 1;
+						TCK = 0;
+
+						TDI = P2B5;
+						P2B5 = TDO;
+						TCK = 1;
+						TCK = 0;
+
+						TDI = P2B6;
+						P2B6 = TDO;
+						TCK = 1;
+						TCK = 0;
+
+						TDI = P2B7;
+						P2B7 = TDO;
+						TCK = 1;
+						TCK = 0;
+
+						transmit_buffer[transmit_buffer_in_offset] = P2;
+						transmit_buffer_in_offset++;
+						transmit_buffer_in_offset &= 0x7f;
+
+						#endif
 					}
 					else
 					{
