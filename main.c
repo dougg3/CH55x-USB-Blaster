@@ -629,7 +629,6 @@ void main()
 
 	#ifdef FTDI_AS_MODE
 	ASDO = 1;
-	NCS = 0;
 	#endif
 
 
