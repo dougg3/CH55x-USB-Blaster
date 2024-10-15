@@ -20,7 +20,8 @@ EXTRA_FLAGS = --opt-code-speed
 
 C_FILES = \
 	main.c \
-	../../include/debug.c
+	../../include/debug.c \
+	../../include/spi.c
 
 #EXTRA_FLAGS += -DDE_PRINTF
 
