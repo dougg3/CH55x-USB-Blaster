@@ -10,6 +10,7 @@
 #include <ch554.h>
 #include <ch554_usb.h>
 #include <debug.h>
+#include <spi.h>
 
 #include "ftdi.h"
 
@@ -21,7 +22,6 @@ SBIT(TDI, 0x90, 6);
 SBIT(TDO, 0x90, 7);
 */
 
-
 //uncomment to enable AS mode
 #define FTDI_AS_MODE
 
@@ -32,9 +32,13 @@ SBIT(ASDO, 0xB0,3);
 #endif
 
 SBIT(TMS, 0xB0, 2); // P3.2
-SBIT(TCK, 0x90, 7); // P1.7
-SBIT(TDI, 0x90, 5); // P1.5
-SBIT(TDO, 0x90, 6); // P1.6
+
+// SBIT(TCK, 0x90, 7); // P1.7
+// SBIT(TDI, 0x90, 5); // P1.5
+// SBIT(TDO, 0x90, 6); // P1.6
+#define TCK SCK
+#define TDI MOSI
+#define TDO MISO
 
 SBIT(P2B7, 0xA0, 7);
 SBIT(P2B6, 0xA0, 6);
@@ -597,14 +601,19 @@ void main()
 	CfgFsys();   //CH559时钟选择配置
 	mDelaymS(5); //修改主频等待内部晶振稳定,必加
 
+	SPIMasterModeSet(0);
+	SPI_CK_SET(4);
+
 	USBDeviceCfg();
 	USBDeviceEndPointCfg(); //端点配置
 	USBDeviceIntCfg();		//中断初始化
 
 
+
+
 	#ifdef FTDI_AS_MODE
 
-	//P1.1, 1.5, 1.7 output push-pull,P1.4 P1.6 input
+	//P1.1, 1.5, 1.7 P1.4  output push-pull,P1.6 input
 	P1_MOD_OC &= ~((1 << 1) | (1 << 5) | (1 << 7)|(1 << 4));
 	P1_MOD_OC |= ((1 << 6));
 	P1_DIR_PU |= ((1 << 1) | (1 << 5) | (1 << 7) | (1 << 6)|(1 << 4));
@@ -684,12 +693,14 @@ void main()
 				//TODO: Assembly implementation for IO control. 
 				//TODO: Use hardware spi for shift control.
 				if (shift_count == 0)
-				{
+				{   SPI0_CTRL = 0x00;
 					shift_en = P2B7;
 					read_en = P2B6;
 					if (shift_en)
 					{
 						shift_count = P2 & 0x3f;
+						if(NCS)
+							SPI0_CTRL = 0x60;
 					}
 					else if (read_en)
 					{
@@ -732,6 +743,7 @@ void main()
 						#endif
 
 					}
+					
 				}
 				else
 				{
@@ -788,47 +800,14 @@ void main()
 						transmit_buffer_in_offset++;
 						transmit_buffer_in_offset &= 0x7f;
 					}else{
-						TDI = P2B0;
-						P2B0 = TDO;
-						TCK = 1;
-						TCK = 0;
 
-						TDI = P2B1;
-						P2B1 = TDO;
-						TCK = 1;
-						TCK = 0;
 
-						TDI = P2B2;
-						P2B2 = TDO;
-						TCK = 1;
-						TCK = 0;
 
-						TDI = P2B3;
-						P2B3 = TDO;
-						TCK = 1;
-						TCK = 0;
+						
+						CH554SPIMasterWrite(P2);
+						
 
-						TDI = P2B4;
-						P2B4 = TDO;
-						TCK = 1;
-						TCK = 0;
-
-						TDI = P2B5;
-						P2B5 = TDO;
-						TCK = 1;
-						TCK = 0;
-
-						TDI = P2B6;
-						P2B6 = TDO;
-						TCK = 1;
-						TCK = 0;
-
-						TDI = P2B7;
-						P2B7 = TDO;
-						TCK = 1;
-						TCK = 0;
-
-						transmit_buffer[transmit_buffer_in_offset] = P2;
+						transmit_buffer[transmit_buffer_in_offset] = SPI0_DATA ;
 						transmit_buffer_in_offset++;
 						transmit_buffer_in_offset &= 0x7f;
 					}
@@ -884,37 +863,41 @@ void main()
 					}
 					else
 					{
-						TDI = P2B0;
-						TCK = 1;
-						TCK = 0;
 
-						TDI = P2B1;
-						TCK = 1;
-						TCK = 0;
+						// TDI = P2B0;
+						// TCK = 1;
+						// TCK = 0;
 
-						TDI = P2B2;
-						TCK = 1;
-						TCK = 0;
+						// TDI = P2B1;
+						// TCK = 1;
+						// TCK = 0;
 
-						TDI = P2B3;
-						TCK = 1;
-						TCK = 0;
+						// TDI = P2B2;
+						// TCK = 1;
+						// TCK = 0;
 
-						TDI = P2B4;
-						TCK = 1;
-						TCK = 0;
+						// TDI = P2B3;
+						// TCK = 1;
+						// TCK = 0;
 
-						TDI = P2B5;
-						TCK = 1;
-						TCK = 0;
+						// TDI = P2B4;
+						// TCK = 1;
+						// TCK = 0;
 
-						TDI = P2B6;
-						TCK = 1;
-						TCK = 0;
+						// TDI = P2B5;
+						// TCK = 1;
+						// TCK = 0;
 
-						TDI = P2B7;
-						TCK = 1;
-						TCK = 0;
+						// TDI = P2B6;
+						// TCK = 1;
+						// TCK = 0;
+
+						// TDI = P2B7;
+						// TCK = 1;
+						// TCK = 0;
+						
+						CH554SPIMasterWrite(P2); 
+						
 					}
 				}
 			}
