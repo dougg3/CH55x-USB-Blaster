@@ -14,32 +14,26 @@
 
 #include "ftdi.h"
 
-SBIT(LED, 0x90, 1); // P1.1
-/*
-SBIT(TMS, 0x90, 4);
-SBIT(TCK, 0x90, 5);
-SBIT(TDI, 0x90, 6);
-SBIT(TDO, 0x90, 7);
-*/
+
 
 //uncomment to enable AS mode
 #define FTDI_AS_MODE
+//uncomment to enable Hardware SPI
+#define HARDWARE_SPI
 
-#ifdef FTDI_AS_MODE
-SBIT(NCS, 0x90,4);
-SBIT(NCE, 0xB0,4);
-SBIT(ASDO, 0xB0,3);
-#endif
 
+
+//gpio
+SBIT(LED, 0x90, 1); // P1.1
 SBIT(TMS, 0xB0, 2); // P3.2
+SBIT(NCS, 0x90,4);//P1.4
+SBIT(NCE, 0xB0,4);//P3.4
+SBIT(ASDO, 0xB0,3);//P3.3
+#define TCK SCK  // P1.7
+#define TDI MOSI // P1.5
+#define TDO MISO // P1.6
 
-// SBIT(TCK, 0x90, 7); // P1.7
-// SBIT(TDI, 0x90, 5); // P1.5
-// SBIT(TDO, 0x90, 6); // P1.6
-#define TCK SCK
-#define TDI MOSI
-#define TDO MISO
-
+//bit-bang
 SBIT(P2B7, 0xA0, 7);
 SBIT(P2B6, 0xA0, 6);
 SBIT(P2B5, 0xA0, 5);
@@ -587,6 +581,106 @@ __idata uint8_t transmit_buffer_in_offset;
 __idata uint8_t transmit_buffer_out_offset;
 __idata uint8_t send_len;
 
+
+
+uint8_t inline shift_data(){
+
+      #ifndef HARDWARE_SPI
+	  					TDI = P2B0;
+						P2B0 = TDO;
+						TCK = 1;
+						TCK = 0;
+
+						TDI = P2B1;
+						P2B1 = TDO;
+						TCK = 1;
+						TCK = 0;
+
+						TDI = P2B2;
+						P2B2 = TDO;
+						TCK = 1;
+						TCK = 0;
+
+						TDI = P2B3;
+						P2B3 = TDO;
+						TCK = 1;
+						TCK = 0;
+
+						TDI = P2B4;
+						P2B4 = TDO;
+						TCK = 1;
+						TCK = 0;
+
+						TDI = P2B5;
+						P2B5 = TDO;
+						TCK = 1;
+						TCK = 0;
+
+						TDI = P2B6;
+						P2B6 = TDO;
+						TCK = 1;
+						TCK = 0;
+
+						TDI = P2B7;
+						P2B7 = TDO;
+						TCK = 1;
+						TCK = 0;
+						return P2;
+		#else
+				CH554SPIMasterWrite(P2);
+				return SPI0_DATA;
+		#endif
+
+}
+
+
+uint8_t inline shift_data_AS(){
+					
+						TDI = P2B0;
+						P2B0 = ASDO;
+						TCK = 1;
+						TCK = 0;
+
+						TDI = P2B1;
+						P2B1 = ASDO;
+						TCK = 1;
+						TCK = 0;
+
+						TDI = P2B2;
+						P2B2 = ASDO;
+						TCK = 1;
+						TCK = 0;
+
+						TDI = P2B3;
+						P2B3 = ASDO;
+						TCK = 1;
+						TCK = 0;
+
+						TDI = P2B4;
+						P2B4 = ASDO;
+						TCK = 1;
+						TCK = 0;
+
+						TDI = P2B5;
+						P2B5 = ASDO;
+						TCK = 1;
+						TCK = 0;
+
+						TDI = P2B6;
+						P2B6 = ASDO;
+						TCK = 1;
+						TCK = 0;
+
+						TDI = P2B7;
+						P2B7 = ASDO;
+						TCK = 1;
+						TCK = 0;
+						
+	return P2;
+
+}
+
+
 //主函数
 void main()
 {
@@ -601,9 +695,10 @@ void main()
 	CfgFsys();   //CH559时钟选择配置
 	mDelaymS(5); //修改主频等待内部晶振稳定,必加
 
+	#ifdef HARDWARE_SPI
 	SPIMasterModeSet(0);
 	SPI_CK_SET(4);
-
+	#endif
 	USBDeviceCfg();
 	USBDeviceEndPointCfg(); //端点配置
 	USBDeviceIntCfg();		//中断初始化
@@ -693,18 +788,28 @@ void main()
 				//TODO: Assembly implementation for IO control. 
 				//TODO: Use hardware spi for shift control.
 				if (shift_count == 0)
-				{   SPI0_CTRL = 0x00;
+				{   
+					#ifdef HARDWARE_SPI
+						SPI0_CTRL = 0x00;
+					#endif
 					shift_en = P2B7;
 					read_en = P2B6;
 					if (shift_en)
 					{
 						shift_count = P2 & 0x3f;
-						if(NCS)
-							SPI0_CTRL = 0x60;
+						#ifdef HARDWARE_SPI
+							#ifdef FTDI_AS_MODE
+							if(!((!NCS)&&(read_en)))
+								SPI0_CTRL = 0x60;
+							#else
+								SPI0_CTRL = 0x60;
+							#endif
+						#endif	
 					}
 					else if (read_en)
 					{
-						LED = !P2B5;
+
+						LED=!P2B5;
 						TDI = P2B4;
 						TMS = P2B1;
 						TCK = P2B0;
@@ -732,7 +837,7 @@ void main()
 					}
 					else
 					{
-						LED = !P2B5;
+						LED=!P2B5;
 						TDI = P2B4;
 						TMS = P2B1;
 						TCK = P2B0;
@@ -755,149 +860,27 @@ void main()
 						#ifdef FTDI_AS_MODE
 
 						if(!NCS){
-
-						TDI = P2B0;
-						P2B0 = ASDO;
-						TCK = 1;
-						TCK = 0;
-
-						TDI = P2B1;
-						P2B1 = ASDO;
-						TCK = 1;
-						TCK = 0;
-
-						TDI = P2B2;
-						P2B2 = ASDO;
-						TCK = 1;
-						TCK = 0;
-
-						TDI = P2B3;
-						P2B3 = ASDO;
-						TCK = 1;
-						TCK = 0;
-
-						TDI = P2B4;
-						P2B4 = ASDO;
-						TCK = 1;
-						TCK = 0;
-
-						TDI = P2B5;
-						P2B5 = ASDO;
-						TCK = 1;
-						TCK = 0;
-
-						TDI = P2B6;
-						P2B6 = ASDO;
-						TCK = 1;
-						TCK = 0;
-
-						TDI = P2B7;
-						P2B7 = ASDO;
-						TCK = 1;
-						TCK = 0;
-
-						transmit_buffer[transmit_buffer_in_offset] = P2;
+						transmit_buffer[transmit_buffer_in_offset] = shift_data_AS();
 						transmit_buffer_in_offset++;
 						transmit_buffer_in_offset &= 0x7f;
 					}else{
-
-
-
-						
-						CH554SPIMasterWrite(P2);
-						
-
-						transmit_buffer[transmit_buffer_in_offset] = SPI0_DATA ;
+						transmit_buffer[transmit_buffer_in_offset] =shift_data() ;
 						transmit_buffer_in_offset++;
 						transmit_buffer_in_offset &= 0x7f;
 					}
 						
 						#else
-
-
-						TDI = P2B0;
-						P2B0 = TDO;
-						TCK = 1;
-						TCK = 0;
-
-						TDI = P2B1;
-						P2B1 = TDO;
-						TCK = 1;
-						TCK = 0;
-
-						TDI = P2B2;
-						P2B2 = TDO;
-						TCK = 1;
-						TCK = 0;
-
-						TDI = P2B3;
-						P2B3 = TDO;
-						TCK = 1;
-						TCK = 0;
-
-						TDI = P2B4;
-						P2B4 = TDO;
-						TCK = 1;
-						TCK = 0;
-
-						TDI = P2B5;
-						P2B5 = TDO;
-						TCK = 1;
-						TCK = 0;
-
-						TDI = P2B6;
-						P2B6 = TDO;
-						TCK = 1;
-						TCK = 0;
-
-						TDI = P2B7;
-						P2B7 = TDO;
-						TCK = 1;
-						TCK = 0;
-
-						transmit_buffer[transmit_buffer_in_offset] = P2;
+						transmit_buffer[transmit_buffer_in_offset] = shift_data();
 						transmit_buffer_in_offset++;
 						transmit_buffer_in_offset &= 0x7f;
-
 						#endif
 					}
 					else
 					{
 
-						// TDI = P2B0;
-						// TCK = 1;
-						// TCK = 0;
-
-						// TDI = P2B1;
-						// TCK = 1;
-						// TCK = 0;
-
-						// TDI = P2B2;
-						// TCK = 1;
-						// TCK = 0;
-
-						// TDI = P2B3;
-						// TCK = 1;
-						// TCK = 0;
-
-						// TDI = P2B4;
-						// TCK = 1;
-						// TCK = 0;
-
-						// TDI = P2B5;
-						// TCK = 1;
-						// TCK = 0;
-
-						// TDI = P2B6;
-						// TCK = 1;
-						// TCK = 0;
-
-						// TDI = P2B7;
-						// TCK = 1;
-						// TCK = 0;
-						
-						CH554SPIMasterWrite(P2); 
-						
+				
+						shift_data();
+				
 					}
 				}
 			}
