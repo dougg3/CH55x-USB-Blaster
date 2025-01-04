@@ -697,6 +697,8 @@ void main()
 
 	#ifdef HARDWARE_SPI
 	SPIMasterModeSet(0);
+	SPI0_SETUP = 0x08; // LSB first
+	SPI0_CTRL = 0x00; // Disable outputs for now
 	SPI_CK_SET(4);
 	#endif
 	USBDeviceCfg();
