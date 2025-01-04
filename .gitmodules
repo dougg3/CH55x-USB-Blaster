@@ -1,0 +1,3 @@
+[submodule "ch554_sdcc"]
+	path = ch554_sdcc
+	url = https://github.com/Blinkinlabs/ch554_sdcc.git

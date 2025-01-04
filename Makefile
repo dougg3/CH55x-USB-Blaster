@@ -20,11 +20,12 @@ EXTRA_FLAGS = --opt-code-speed
 
 C_FILES = \
 	main.c \
-	../../include/debug.c
+	ch554_sdcc/include/debug.c \
+	ch554_sdcc/include/spi.c
 
 #EXTRA_FLAGS += -DDE_PRINTF
 
 pre-flash:
 	
 
-include ../Makefile.include
+include ch554_sdcc/examples/Makefile.include

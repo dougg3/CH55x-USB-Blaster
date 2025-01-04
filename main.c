@@ -10,22 +10,30 @@
 #include <ch554.h>
 #include <ch554_usb.h>
 #include <debug.h>
+#include <spi.h>
 
 #include "ftdi.h"
 
+
+
+//uncomment to enable AS mode
+#define FTDI_AS_MODE
+//uncomment to enable Hardware SPI
+#define HARDWARE_SPI
+
+
+
+//gpio
 SBIT(LED, 0x90, 1); // P1.1
-/*
-SBIT(TMS, 0x90, 4);
-SBIT(TCK, 0x90, 5);
-SBIT(TDI, 0x90, 6);
-SBIT(TDO, 0x90, 7);
-*/
-
 SBIT(TMS, 0xB0, 2); // P3.2
-SBIT(TCK, 0x90, 7); // P1.7
-SBIT(TDI, 0x90, 5); // P1.5
-SBIT(TDO, 0x90, 6); // P1.6
+SBIT(NCS, 0x90,4);//P1.4
+SBIT(NCE, 0xB0,4);//P3.4
+SBIT(ASDO, 0xB0,3);//P3.3
+#define TCK SCK  // P1.7
+#define TDI MOSI // P1.5
+#define TDO MISO // P1.6
 
+//bit-bang
 SBIT(P2B7, 0xA0, 7);
 SBIT(P2B6, 0xA0, 6);
 SBIT(P2B5, 0xA0, 5);
@@ -573,6 +581,106 @@ __idata uint8_t transmit_buffer_in_offset;
 __idata uint8_t transmit_buffer_out_offset;
 __idata uint8_t send_len;
 
+
+
+uint8_t inline shift_data(){
+
+      #ifndef HARDWARE_SPI
+	  					TDI = P2B0;
+						P2B0 = TDO;
+						TCK = 1;
+						TCK = 0;
+
+						TDI = P2B1;
+						P2B1 = TDO;
+						TCK = 1;
+						TCK = 0;
+
+						TDI = P2B2;
+						P2B2 = TDO;
+						TCK = 1;
+						TCK = 0;
+
+						TDI = P2B3;
+						P2B3 = TDO;
+						TCK = 1;
+						TCK = 0;
+
+						TDI = P2B4;
+						P2B4 = TDO;
+						TCK = 1;
+						TCK = 0;
+
+						TDI = P2B5;
+						P2B5 = TDO;
+						TCK = 1;
+						TCK = 0;
+
+						TDI = P2B6;
+						P2B6 = TDO;
+						TCK = 1;
+						TCK = 0;
+
+						TDI = P2B7;
+						P2B7 = TDO;
+						TCK = 1;
+						TCK = 0;
+						return P2;
+		#else
+				CH554SPIMasterWrite(P2);
+				return SPI0_DATA;
+		#endif
+
+}
+
+
+uint8_t inline shift_data_AS(){
+					
+						TDI = P2B0;
+						P2B0 = ASDO;
+						TCK = 1;
+						TCK = 0;
+
+						TDI = P2B1;
+						P2B1 = ASDO;
+						TCK = 1;
+						TCK = 0;
+
+						TDI = P2B2;
+						P2B2 = ASDO;
+						TCK = 1;
+						TCK = 0;
+
+						TDI = P2B3;
+						P2B3 = ASDO;
+						TCK = 1;
+						TCK = 0;
+
+						TDI = P2B4;
+						P2B4 = ASDO;
+						TCK = 1;
+						TCK = 0;
+
+						TDI = P2B5;
+						P2B5 = ASDO;
+						TCK = 1;
+						TCK = 0;
+
+						TDI = P2B6;
+						P2B6 = ASDO;
+						TCK = 1;
+						TCK = 0;
+
+						TDI = P2B7;
+						P2B7 = ASDO;
+						TCK = 1;
+						TCK = 0;
+						
+	return P2;
+
+}
+
+
 //主函数
 void main()
 {
@@ -587,9 +695,31 @@ void main()
 	CfgFsys();   //CH559时钟选择配置
 	mDelaymS(5); //修改主频等待内部晶振稳定,必加
 
+	#ifdef HARDWARE_SPI
+	SPIMasterModeSet(0);
+	SPI0_SETUP = 0x08; // LSB first
+	SPI0_CTRL = 0x00; // Disable outputs for now
+	SPI_CK_SET(4);
+	#endif
 	USBDeviceCfg();
 	USBDeviceEndPointCfg(); //端点配置
 	USBDeviceIntCfg();		//中断初始化
+
+
+
+
+	#ifdef FTDI_AS_MODE
+
+	//P1.1, 1.5, 1.7 P1.4  output push-pull,P1.6 input
+	P1_MOD_OC &= ~((1 << 1) | (1 << 5) | (1 << 7)|(1 << 4));
+	P1_MOD_OC |= ((1 << 6));
+	P1_DIR_PU |= ((1 << 1) | (1 << 5) | (1 << 7) | (1 << 6)|(1 << 4));
+	//P3.2 P3.4 output push-pull,P3.3 INPUT
+	P3_MOD_OC &= ~((1 << 2)|(1 << 4));
+	P3_MOD_OC |= (1 << 3);
+	P3_DIR_PU |= ((1 << 2)|(1 << 4)|(1 << 3));
+
+	#else
 
 	//P1.1, 1.5, 1.7 output push-pull, P1.6 input
 	P1_MOD_OC &= ~((1 << 1) | (1 << 5) | (1 << 7));
@@ -598,7 +728,15 @@ void main()
 	//P3.2 output push-pull
 	P3_MOD_OC &= ~(1 << 2);
 	P3_DIR_PU |= (1 << 2);
+
+	#endif
+
 	TDO = 1;
+
+	#ifdef FTDI_AS_MODE
+	ASDO = 1;
+	#endif
+
 
 	UEP0_T_LEN = 0;
 	UEP1_T_LEN = 0; //预使用发送长度一定要清空
@@ -652,113 +790,99 @@ void main()
 				//TODO: Assembly implementation for IO control. 
 				//TODO: Use hardware spi for shift control.
 				if (shift_count == 0)
-				{
+				{   
+					#ifdef HARDWARE_SPI
+						SPI0_CTRL = 0x00;
+					#endif
 					shift_en = P2B7;
 					read_en = P2B6;
 					if (shift_en)
 					{
 						shift_count = P2 & 0x3f;
+						#ifdef HARDWARE_SPI
+							#ifdef FTDI_AS_MODE
+							if(!((!NCS)&&(read_en)))
+								SPI0_CTRL = 0x60;
+							#else
+								SPI0_CTRL = 0x60;
+							#endif
+						#endif	
 					}
 					else if (read_en)
 					{
-						LED = !P2B5;
+
+						LED=!P2B5;
 						TDI = P2B4;
 						TMS = P2B1;
 						TCK = P2B0;
+
+						#ifdef FTDI_AS_MODE
+							NCE = P2B2;
+							NCS = P2B3;
+						#endif
+
+						#ifdef FTDI_AS_MODE
+								transmit_buffer[transmit_buffer_in_offset] = TDO;
+								transmit_buffer[transmit_buffer_in_offset] |= (ASDO<<1);
+								transmit_buffer_in_offset++;
+								transmit_buffer_in_offset &= 0x7f;// %= sizeof(transmit_buffer);
+						#else
+
 						transmit_buffer[transmit_buffer_in_offset] = TDO;
 						transmit_buffer_in_offset++;
 						transmit_buffer_in_offset &= 0x7f;// %= sizeof(transmit_buffer);
+
+						#endif
+
+
+
 					}
 					else
 					{
-						LED = !P2B5;
+						LED=!P2B5;
 						TDI = P2B4;
 						TMS = P2B1;
 						TCK = P2B0;
+
+						#ifdef FTDI_AS_MODE
+							NCE = P2B2;
+							NCS = P2B3;
+						#endif
+
 					}
+					
 				}
 				else
 				{
 					shift_count--;
 					if (read_en)
 					{
-						TDI = P2B0;
-						P2B0 = TDO;
-						TCK = 1;
-						TCK = 0;
 
-						TDI = P2B1;
-						P2B1 = TDO;
-						TCK = 1;
-						TCK = 0;
 
-						TDI = P2B2;
-						P2B2 = TDO;
-						TCK = 1;
-						TCK = 0;
+						#ifdef FTDI_AS_MODE
 
-						TDI = P2B3;
-						P2B3 = TDO;
-						TCK = 1;
-						TCK = 0;
-
-						TDI = P2B4;
-						P2B4 = TDO;
-						TCK = 1;
-						TCK = 0;
-
-						TDI = P2B5;
-						P2B5 = TDO;
-						TCK = 1;
-						TCK = 0;
-
-						TDI = P2B6;
-						P2B6 = TDO;
-						TCK = 1;
-						TCK = 0;
-
-						TDI = P2B7;
-						P2B7 = TDO;
-						TCK = 1;
-						TCK = 0;
-
-						transmit_buffer[transmit_buffer_in_offset] = P2;
+						if(!NCS){
+						transmit_buffer[transmit_buffer_in_offset] = shift_data_AS();
+						transmit_buffer_in_offset++;
+						transmit_buffer_in_offset &= 0x7f;
+					}else{
+						transmit_buffer[transmit_buffer_in_offset] =shift_data() ;
 						transmit_buffer_in_offset++;
 						transmit_buffer_in_offset &= 0x7f;
 					}
+						
+						#else
+						transmit_buffer[transmit_buffer_in_offset] = shift_data();
+						transmit_buffer_in_offset++;
+						transmit_buffer_in_offset &= 0x7f;
+						#endif
+					}
 					else
 					{
-						TDI = P2B0;
-						TCK = 1;
-						TCK = 0;
 
-						TDI = P2B1;
-						TCK = 1;
-						TCK = 0;
-
-						TDI = P2B2;
-						TCK = 1;
-						TCK = 0;
-
-						TDI = P2B3;
-						TCK = 1;
-						TCK = 0;
-
-						TDI = P2B4;
-						TCK = 1;
-						TCK = 0;
-
-						TDI = P2B5;
-						TCK = 1;
-						TCK = 0;
-
-						TDI = P2B6;
-						TCK = 1;
-						TCK = 0;
-
-						TDI = P2B7;
-						TCK = 1;
-						TCK = 0;
+				
+						shift_data();
+				
 					}
 				}
 			}
